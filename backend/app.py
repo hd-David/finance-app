@@ -1,12 +1,14 @@
 import os
-from flask import Flask, flash, redirect, render_template,session, request, url_for
+from flask import Flask, flash, redirect, render_template,session, request, url_for, jsonify
 from helpers import *
 from create import *
-from model import dbconnect, User, Address, Transaction
+from model import dbconnect, User, Address, Transaction, Portfolio
 from flask_bootstrap import Bootstrap
-import forms
 from sqlalchemy.exc import IntegrityError
 from flask_login import current_user, LoginManager, login_user, logout_user
+from flask_cors import CORS
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from datetime import timedelta
 
 
 
@@ -14,6 +16,16 @@ from flask_login import current_user, LoginManager, login_user, logout_user
 # Configure application
 
 app = Flask(__name__, static_folder="static")
+
+# CORS configuration for React frontend
+CORS(app, resources={
+    r"/api/*": {
+        "origins": ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:5173"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": True
+    }
+})
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -33,6 +45,11 @@ app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
 SECRET_KEY = os.urandom(64)
 app.config['SECRET_KEY'] = SECRET_KEY
+
+# JWT Configuration
+app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', SECRET_KEY.hex())
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
+jwt = JWTManager(app)
 
 
 
@@ -150,27 +167,30 @@ def logout():
 @login_required
 def quote():
     """Get stock quote."""
-    global lookup_for_stock
-    form = forms.QuoteForm()
-    if form.validate_on_submit():
-        symbol = form.symbol.data
-        quantity = form.number_of_shares.data
-        print(symbol, quantity)
+    if request.method == 'POST':
+        symbol = request.form.get('symbol')
+        quantity = request.form.get('number_of_shares', 1)
+        
         # we check the data user entered
         if not symbol or not quantity:
             return "Missing stock symbol and number of stocks", 400
         # Negative number of stocks
-        elif int(quantity) < 0:
-            return "Please enters above one or positive  number of stocks", 400
+        try:
+            quantity = int(quantity)
+            if quantity < 0:
+                return "Please enter a positive number of stocks", 400
+        except ValueError:
+            return "Invalid quantity", 400
+            
         stock_info = lookup(symbol)
         # Use lookup function to check if stock code is valid
         if not stock_info:
             return "stock code was not found, please enter a valid stock symbol", 400
         else:
             # Display the stock information to the user: Stock code, price, and stock name
-            return render_template("quoted.html", name=stock_info["name"], symbol=stock_info["symbol"],  price = stock_info["price"], order_price = (stock_info["price"] * int(quantity)), quantity=quantity)
+            return render_template("quoted.html", name=stock_info["name"], symbol=stock_info["symbol"],  price = stock_info["price"], order_price = (stock_info["price"] * quantity), quantity=quantity)
 
-    return render_template("quote.html", form=form)
+    return render_template("quote.html")
 
 
 
@@ -246,41 +266,52 @@ def sell(symbol, quantity):
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
-    form = forms.RegistrationForm()
-    if form.validate_on_submit():
-        print(form.username.data)
-        # Check if the full_names or email already exists in the database
-        existing_user = session_db.query(User).filter(User.email == form.email.data).first()
-        existing_username = session_db.query(User).filter(User.username == form.username.data).first()
-        if existing_user is not None and existing_user.email == form.email.data:
-            form.email.errors.append('Please email already exist, use a different email address.')
-        if existing_username is not None and existing_username.username == form.username.data:
-            form.username.errors.append('Please username already exist, use a different username.')
-        else:
-            try:
-                # Create the user object
-                hashed_password = generate_password_hash(form.password.data)
-                user = User(
-                    full_names=form.full_names.data,
-                    email=form.email.data,
-                    password_hash=hashed_password,
-                    username=form.username.data
-                )
-                # Add the user to the session and commit to the database
-                session_db.add(user)
-                session_db.commit()
+    if request.method == 'POST':
+        username = request.form.get('username')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        full_names = request.form.get('full_names')
+        
+        # Validate inputs
+        if not username or not email or not password or not full_names:
+            flash('All fields are required.')
+            return render_template('register.html')
+        
+        # Check if the user or email already exists in the database
+        existing_user = session_db.query(User).filter(User.email == email).first()
+        existing_username = session_db.query(User).filter(User.username == username).first()
+        
+        if existing_user is not None and existing_user.email == email:
+            flash('This email already exists, please use a different email address.')
+            return render_template('register.html')
+        if existing_username is not None and existing_username.username == username:
+            flash('This username already exists, please use a different username.')
+            return render_template('register.html')
+        
+        try:
+            # Create the user object
+            hashed_password = generate_password_hash(password)
+            user = User(
+                full_names=full_names,
+                email=email,
+                password_hash=hashed_password,
+                username=username
+            )
+            # Add the user to the session and commit to the database
+            session_db.add(user)
+            session_db.commit()
 
-                flash('You have successfully registered.')
-                return redirect(url_for('login'))
-            except IntegrityError:
-                # Handle the case when the full_names or email already exists
-                session_db.rollback()
-                flash('Username or email already exists. Please choose a different one.')
-            except Exception as e:
-                # Catch any other errors that may occur and handle them appropriately
-                flash('An error occurred while registering the user: {}'.format(e))
+            flash('You have successfully registered.')
+            return redirect(url_for('login'))
+        except IntegrityError:
+            # Handle the case when the username or email already exists
+            session_db.rollback()
+            flash('Username or email already exists. Please choose a different one.')
+        except Exception as e:
+            # Catch any other errors that may occur and handle them appropriately
+            flash('An error occurred while registering the user: {}'.format(e))
 
-    return render_template('register.html', form=form)
+    return render_template('register.html')
 
 
 
@@ -423,6 +454,349 @@ def get_trending_stocks():
         })
 
     return stocks
+
+# ============================================
+# REST API ENDPOINTS FOR REACT FRONTEND
+# ============================================
+
+@app.route("/api/register", methods=["POST"])
+def api_register():
+    """API endpoint for user registration"""
+    data = request.get_json()
+    
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+    
+    # Validate required fields
+    required_fields = ['username', 'email', 'password', 'full_names']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({"error": f"Missing field: {field}"}), 400
+    
+    # Check if user already exists
+    existing_user = session_db.query(User).filter(User.email == data['email']).first()
+    if existing_user:
+        return jsonify({"error": "Email already exists"}), 400
+    
+    existing_username = session_db.query(User).filter(User.username == data['username']).first()
+    if existing_username:
+        return jsonify({"error": "Username already exists"}), 400
+    
+    try:
+        # Create new user
+        hashed_password = generate_password_hash(data['password'])
+        user = User(
+            full_names=data['full_names'],
+            email=data['email'],
+            password_hash=hashed_password,
+            username=data['username']
+        )
+        session_db.add(user)
+        session_db.commit()
+        
+        return jsonify({
+            "message": "User registered successfully",
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "full_names": user.full_names
+            }
+        }), 201
+    except Exception as e:
+        session_db.rollback()
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/login", methods=["POST"])
+def api_login():
+    """API endpoint for user login"""
+    data = request.get_json()
+    
+    if not data or 'username_or_email' not in data or 'password' not in data:
+        return jsonify({"error": "Username/email and password required"}), 400
+    
+    username_or_email = data['username_or_email']
+    password = data['password']
+    
+    # Query for user
+    user = session_db.query(User).filter(
+        (User.email == username_or_email) | (User.username == username_or_email)
+    ).first()
+    
+    if not user or not user.verify_password(password):
+        return jsonify({"error": "Invalid credentials"}), 401
+    
+    # Create JWT token
+    access_token = create_access_token(identity=user.id)
+    
+    return jsonify({
+        "message": "Login successful",
+        "access_token": access_token,
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "full_names": user.full_names,
+            "cash": float(user.cash)
+        }
+    }), 200
+
+@app.route("/api/logout", methods=["POST"])
+@jwt_required()
+def api_logout():
+    """API endpoint for user logout"""
+    # JWT tokens are stateless, so we just return success
+    # The frontend should remove the token
+    return jsonify({"message": "Logout successful"}), 200
+
+@app.route("/api/portfolio", methods=["GET"])
+@jwt_required()
+def api_get_portfolio():
+    """API endpoint to get user's portfolio"""
+    user_id = get_jwt_identity()
+    
+    # Get portfolio data
+    portfolio_data = get_portfolio_data(user_id)
+    
+    # Get user's cash
+    user = session_db.query(User).get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    
+    # Calculate totals
+    stock_value = sum(stock['total_value'] for stock in portfolio_data)
+    grand_total = stock_value + user.cash
+    
+    return jsonify({
+        "portfolio": portfolio_data,
+        "cash": float(user.cash),
+        "stock_value": float(stock_value),
+        "total": float(grand_total)
+    }), 200
+
+@app.route("/api/quote", methods=["POST"])
+@jwt_required()
+def api_quote():
+    """API endpoint to get stock quote"""
+    data = request.get_json()
+    
+    if not data or 'symbol' not in data:
+        return jsonify({"error": "Stock symbol required"}), 400
+    
+    symbol = data['symbol']
+    quantity = data.get('quantity', 1)
+    
+    # Validate quantity
+    try:
+        quantity = int(quantity)
+        if quantity <= 0:
+            return jsonify({"error": "Quantity must be positive"}), 400
+    except ValueError:
+        return jsonify({"error": "Invalid quantity"}), 400
+    
+    # Lookup stock
+    stock_info = lookup(symbol)
+    if not stock_info:
+        return jsonify({"error": "Invalid stock symbol"}), 404
+    
+    return jsonify({
+        "name": stock_info["name"],
+        "symbol": stock_info["symbol"],
+        "price": float(stock_info["price"]),
+        "quantity": quantity,
+        "order_price": float(stock_info["price"] * quantity)
+    }), 200
+
+@app.route("/api/buy", methods=["POST"])
+@jwt_required()
+def api_buy():
+    """API endpoint to buy stocks"""
+    user_id = get_jwt_identity()
+    data = request.get_json()
+    
+    if not data or 'symbol' not in data or 'quantity' not in data:
+        return jsonify({"error": "Symbol and quantity required"}), 400
+    
+    symbol = data['symbol']
+    quantity = data['quantity']
+    
+    # Call existing buy function
+    result = buy_for_user(user_id, symbol, quantity)
+    
+    if result == "Success":
+        return jsonify({"message": "Stock purchased successfully"}), 200
+    else:
+        return jsonify({"error": result}), 400
+
+@app.route("/api/sell", methods=["POST"])
+@jwt_required()
+def api_sell():
+    """API endpoint to sell stocks"""
+    user_id = get_jwt_identity()
+    data = request.get_json()
+    
+    if not data or 'symbol' not in data or 'quantity' not in data:
+        return jsonify({"error": "Symbol and quantity required"}), 400
+    
+    symbol = data['symbol']
+    quantity = data['quantity']
+    
+    # Call existing sell function
+    result = sell_for_user(user_id, symbol, quantity)
+    
+    if result == "Success":
+        return jsonify({"message": "Stock sold successfully"}), 200
+    else:
+        return jsonify({"error": result}), 400
+
+@app.route("/api/history", methods=["GET"])
+@jwt_required()
+def api_history():
+    """API endpoint to get transaction history"""
+    user_id = get_jwt_identity()
+    
+    # Get all transactions for the user
+    transactions = session_db.query(Transaction).filter_by(user_id=user_id).order_by(Transaction.timestamp.desc()).all()
+    
+    # Convert to JSON-serializable format
+    transaction_list = []
+    for t in transactions:
+        transaction_list.append({
+            "id": t.id,
+            "symbol": t.symbol,
+            "quantity": t.quantity,
+            "price": float(t.price),
+            "transaction_type": t.transaction_type,
+            "timestamp": t.timestamp.isoformat() if t.timestamp else None
+        })
+    
+    return jsonify({"transactions": transaction_list}), 200
+
+@app.route("/api/trending", methods=["GET"])
+def api_trending():
+    """API endpoint to get trending stocks (public endpoint)"""
+    market_data = get_trending_stocks()
+    return jsonify({"stocks": market_data}), 200
+
+@app.route("/api/user", methods=["GET"])
+@jwt_required()
+def api_get_user():
+    """API endpoint to get current user info"""
+    user_id = get_jwt_identity()
+    user = session_db.query(User).get(user_id)
+    
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    
+    return jsonify({
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "full_names": user.full_names,
+        "cash": float(user.cash)
+    }), 200
+
+# Helper functions for API endpoints
+def buy_for_user(user_id, symbol, quantity):
+    """Buy stocks for a specific user (used by API)"""
+    stock_info = lookup(symbol)
+    if stock_info is None:
+        return "Invalid symbol"
+    
+    # Validate quantity
+    try:
+        quantity = int(quantity)
+        if quantity <= 0:
+            return "Quantity must be positive"
+    except ValueError:
+        return "Invalid quantity"
+    
+    user = session_db.query(User).get(user_id)
+    if not user:
+        return "User not found"
+    
+    budget = user.cash
+    if stock_info["price"] * quantity > budget:
+        return "Insufficient funds"
+    
+    # Purchase stock
+    total_cost = stock_info["price"] * quantity
+    user.cash -= total_cost
+    
+    # Check if user already owns this stock
+    existing_portfolio = session_db.query(Portfolio).filter_by(user_id=user.id, symbol=symbol).first()
+    if existing_portfolio:
+        existing_portfolio.quantity += quantity
+        existing_portfolio.price = stock_info["price"]
+    else:
+        portfolio = Portfolio(user_id=user.id, symbol=symbol, quantity=quantity, price=stock_info["price"])
+        session_db.add(portfolio)
+    
+    # Record transaction
+    transaction = Transaction(
+        user_id=user.id,
+        symbol=symbol,
+        quantity=quantity,
+        price=stock_info["price"],
+        transaction_type='BUY'
+    )
+    session_db.add(transaction)
+    session_db.commit()
+    
+    return "Success"
+
+def sell_for_user(user_id, symbol, quantity):
+    """Sell shares of stock for a specific user (used by API)"""
+    try:
+        quantity = int(quantity)
+        if quantity <= 0:
+            return "Quantity must be positive"
+    except ValueError:
+        return "Invalid quantity"
+    
+    user = session_db.query(User).get(user_id)
+    if not user:
+        return "User not found"
+    
+    # Check if user owns this stock
+    portfolio_entry = session_db.query(Portfolio).filter_by(user_id=user.id, symbol=symbol).first()
+    
+    if not portfolio_entry:
+        return "You don't own this stock"
+    
+    if portfolio_entry.quantity < quantity:
+        return "Not enough shares"
+    
+    # Get current stock price
+    stock_info = lookup(symbol)
+    if stock_info is None:
+        return "Invalid symbol"
+    
+    # Sell stock
+    total_revenue = stock_info["price"] * quantity
+    user.cash += total_revenue
+    
+    # Update portfolio
+    portfolio_entry.quantity -= quantity
+    if portfolio_entry.quantity == 0:
+        session_db.delete(portfolio_entry)
+    
+    # Record transaction
+    transaction = Transaction(
+        user_id=user.id,
+        symbol=symbol,
+        quantity=quantity,
+        price=stock_info["price"],
+        transaction_type='SELL'
+    )
+    session_db.add(transaction)
+    session_db.commit()
+    
+    return "Success"
+
+# ============================================
+# END OF REST API ENDPOINTS
+# ============================================
         
 if __name__ == '__main__':
     app.run(debug=True)
