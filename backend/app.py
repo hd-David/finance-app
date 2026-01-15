@@ -1,6 +1,6 @@
 import os
 from flask import Flask, request, jsonify
-from helpers import lookup, usd
+from helpers import lookup
 from model import dbconnect, User, Transaction, Portfolio
 from sqlalchemy.exc import IntegrityError
 from flask_cors import CORS

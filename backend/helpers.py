@@ -19,7 +19,9 @@ def lookup(symbol):
         if not quote:
             return None
 
-        data = {"name": symbol.upper(),  # Alpha doesn't return company name here
+        # Note: Alpha Vantage GLOBAL_QUOTE doesn't include company name,
+        # so we use the symbol as a placeholder for display purposes
+        data = {"name": symbol.upper(),
                 "symbol": quote["01. symbol"],
                 "price": float(quote["05. price"])
                 }
