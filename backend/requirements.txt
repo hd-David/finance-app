@@ -1,0 +1,11 @@
+flask
+flask-Session
+requests
+flask_wtf
+sqlalchemy
+flask-Bootstrap
+email_validator
+flask_login
+python-dotenv
+flask-cors
+Flask-JWT-Extended
