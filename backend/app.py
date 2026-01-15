@@ -2,7 +2,7 @@ import os
 from flask import Flask, flash, redirect, render_template,session, request, url_for, jsonify
 from helpers import *
 from create import *
-from model import dbconnect, User, Address, Transaction
+from model import dbconnect, User, Address, Transaction, Portfolio
 from flask_bootstrap import Bootstrap
 from sqlalchemy.exc import IntegrityError
 from flask_login import current_user, LoginManager, login_user, logout_user
@@ -178,7 +178,7 @@ def quote():
         try:
             quantity = int(quantity)
             if quantity < 0:
-                return "Please enters above one or positive  number of stocks", 400
+                return "Please enter a positive number of stocks", 400
         except ValueError:
             return "Invalid quantity", 400
             
@@ -282,10 +282,10 @@ def register():
         existing_username = session_db.query(User).filter(User.username == username).first()
         
         if existing_user is not None and existing_user.email == email:
-            flash('Please email already exist, use a different email address.')
+            flash('This email already exists, please use a different email address.')
             return render_template('register.html')
         if existing_username is not None and existing_username.username == username:
-            flash('Please username already exist, use a different username.')
+            flash('This username already exists, please use a different username.')
             return render_template('register.html')
         
         try:
