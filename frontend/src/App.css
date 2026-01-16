@@ -1,38 +1,348 @@
-.App {
-  text-align: center;
+/* ========================================
+   Finance App - Mobile Responsive Styles
+   SmartAdmin-style + Mobile Enhancements
+   ======================================== */
+
+/* Mobile Menu Toggle Button */
+.mobile-menu-toggle {
+  display: none;
+  padding: 0.5rem 1rem;
+  color: #495057;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+/* Sidebar Enhancements */
+.page-sidebar {
+  transition: transform 0.3s ease-in-out;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 998;
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
+/* Card Enhancements */
+.card {
+  border-radius: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.card.border-left-primary {
+  border-left: 4px solid #3B7DDD;
+}
+
+.card.border-left-success {
+  border-left: 4px solid #28a745;
+}
+
+.card.border-left-info {
+  border-left: 4px solid #17a2b8;
+}
+
+/* Table Enhancements */
+.table-hover tbody tr:hover {
+  background-color: rgba(0, 0, 0, 0.03);
+  cursor: pointer;
+}
+
+/* Touch-friendly buttons */
+.btn {
+  min-height: 44px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
 }
 
-.App-link {
-  color: #61dafb;
+.btn-lg {
+  min-height: 48px;
+  font-size: 1.1rem;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
+/* Badge Styles */
+.badge-pill {
+  padding: 0.35em 0.65em;
+  font-weight: 600;
+}
+
+/* Navigation Divider */
+.nav-divider {
+  margin: 0.5rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Loading States */
+.spinner-border-sm {
+  width: 1rem;
+  height: 1rem;
+  border-width: 0.15em;
+}
+
+/* Text Utilities */
+.text-xs {
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+}
+
+/* ========================================
+   MOBILE RESPONSIVE BREAKPOINTS
+   ======================================== */
+
+/* Extra Small Devices (phones, less than 576px) */
+@media (max-width: 575.98px) {
+  .mobile-menu-toggle {
+    display: block;
   }
-  to {
-    transform: rotate(360deg);
+
+  .page-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 999;
+    transform: translateX(-100%);
+    width: 280px;
+    max-width: 85vw;
+  }
+
+  .page-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .sidebar-overlay {
+    display: block;
+  }
+
+  .page-content-wrapper {
+    margin-left: 0 !important;
+  }
+
+  .page-header {
+    flex-wrap: wrap;
+    padding: 0.75rem 1rem;
+  }
+
+  .page-header .mr-4 {
+    margin-right: 1rem !important;
+    font-size: 0.9rem;
+  }
+
+  .subheader-title {
+    font-size: 1.25rem;
+  }
+
+  .panel-hdr h2 {
+    font-size: 1.1rem;
+  }
+
+  /* Stack cards vertically */
+  .col-md-4 {
+    margin-bottom: 0.75rem;
+  }
+
+  /* Make tables horizontally scrollable */
+  .table-responsive {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table {
+    min-width: 600px;
+  }
+
+  /* Hide desktop table on mobile, show card view */
+  .d-md-none {
+    display: block !important;
+  }
+
+  /* Adjust button sizes for touch */
+  .btn {
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+
+  .form-control-lg {
+    font-size: 1rem;
+  }
+
+  /* Adjust spacing */
+  .p-3 {
+    padding: 1rem !important;
+  }
+}
+
+/* Small Devices (landscape phones, 576px and up) */
+@media (min-width: 576px) and (max-width: 767.98px) {
+  .mobile-menu-toggle {
+    display: block;
+  }
+
+  .page-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 999;
+    transform: translateX(-100%);
+    width: 280px;
+  }
+
+  .page-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .sidebar-overlay {
+    display: block;
+  }
+
+  .page-content-wrapper {
+    margin-left: 0 !important;
+  }
+
+  .table-responsive {
+    overflow-x: auto;
+  }
+}
+
+/* Medium Devices (tablets, 768px and up) */
+@media (min-width: 768px) and (max-width: 991.98px) {
+  .mobile-menu-toggle {
+    display: block;
+  }
+
+  .page-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 999;
+    transform: translateX(-100%);
+    width: 280px;
+  }
+
+  .page-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .sidebar-overlay {
+    display: block;
+  }
+
+  .page-content-wrapper {
+    margin-left: 0 !important;
+  }
+
+  .col-xl-6 {
+    max-width: 100%;
+    flex: 0 0 100%;
+  }
+}
+
+/* Large Devices (desktops, 992px and up) */
+@media (min-width: 992px) {
+  .page-sidebar {
+    position: fixed;
+    transform: translateX(0);
+  }
+
+  .d-md-none {
+    display: none !important;
+  }
+}
+
+/* Extra Large Devices (large desktops, 1200px and up) */
+@media (min-width: 1200px) {
+  .col-xl-6 {
+    max-width: 50%;
+    flex: 0 0 50%;
+  }
+
+  .col-xl-12 {
+    max-width: 100%;
+    flex: 0 0 100%;
+  }
+}
+
+/* ========================================
+   UTILITY CLASSES
+   ======================================== */
+
+/* Alert Improvements */
+.alert {
+  border-radius: 0.5rem;
+  border-left: 4px solid;
+}
+
+.alert-success {
+  border-left-color: #28a745;
+  background-color: #d4edda;
+}
+
+.alert-danger {
+  border-left-color: #dc3545;
+  background-color: #f8d7da;
+}
+
+.alert-info {
+  border-left-color: #17a2b8;
+  background-color: #d1ecf1;
+}
+
+.alert-warning {
+  border-left-color: #ffc107;
+  background-color: #fff3cd;
+}
+
+/* Form Enhancements */
+.form-control:focus {
+  border-color: #886ab5;
+  box-shadow: 0 0 0 0.2rem rgba(136, 106, 181, 0.25);
+}
+
+/* Shadow Utilities */
+.shadow-sm {
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075) !important;
+}
+
+/* Text Colors */
+.text-gray-800 {
+  color: #2e2e2e;
+}
+
+/* Card Body Padding */
+.card-body {
+  padding: 1.25rem;
+}
+
+/* Hover Effects */
+.card:hover {
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  transition: box-shadow 0.3s ease-in-out;
+}
+
+/* ========================================
+   PRINT STYLES
+   ======================================== */
+
+@media print {
+  .page-sidebar,
+  .page-header,
+  .btn,
+  .mobile-menu-toggle {
+    display: none !important;
+  }
+
+  .page-content-wrapper {
+    margin-left: 0 !important;
+  }
+
+  .page-content {
+    padding: 0 !important;
   }
 }
