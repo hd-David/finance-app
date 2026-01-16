@@ -112,33 +112,33 @@ function App() {
               {token ? (
                 <>
                   <li className={currentView === 'dashboard' ? 'active' : ''}>
-                    <a href="#" onClick={(e) => { e.preventDefault(); navigateTo('dashboard'); }}>
+                    <a href="#dashboard" onClick={(e) => { e.preventDefault(); navigateTo('dashboard'); }}>
                       <i className="fal fa-home"></i> Dashboard
                     </a>
                   </li>
                   <li className={currentView === 'buy' ? 'active' : ''}>
-                    <a href="#" onClick={(e) => { e.preventDefault(); navigateTo('buy'); }}>
+                    <a href="#buy" onClick={(e) => { e.preventDefault(); navigateTo('buy'); }}>
                       <i className="fal fa-shopping-cart"></i> Buy
                     </a>
                   </li>
                   <li className={currentView === 'sell' ? 'active' : ''}>
-                    <a href="#" onClick={(e) => { e.preventDefault(); navigateTo('sell'); }}>
+                    <a href="#sell" onClick={(e) => { e.preventDefault(); navigateTo('sell'); }}>
                       <i className="fal fa-hand-holding-usd"></i> Sell
                     </a>
                   </li>
                   <li className={currentView === 'quote' ? 'active' : ''}>
-                    <a href="#" onClick={(e) => { e.preventDefault(); navigateTo('quote'); }}>
+                    <a href="#quote" onClick={(e) => { e.preventDefault(); navigateTo('quote'); }}>
                       <i className="fal fa-search-dollar"></i> Quote
                     </a>
                   </li>
                   <li className={currentView === 'history' ? 'active' : ''}>
-                    <a href="#" onClick={(e) => { e.preventDefault(); navigateTo('history'); }}>
+                    <a href="#history" onClick={(e) => { e.preventDefault(); navigateTo('history'); }}>
                       <i className="fal fa-history"></i> History
                     </a>
                   </li>
                   <li className="nav-divider"></li>
                   <li>
-                    <a href="#" onClick={(e) => { e.preventDefault(); handleLogout(); }}>
+                    <a href="#logout" onClick={(e) => { e.preventDefault(); handleLogout(); }}>
                       <i className="fal fa-sign-out"></i> Logout
                     </a>
                   </li>
@@ -149,7 +149,7 @@ function App() {
                     <a href="/"><i className="fal fa-home"></i> Dashboard</a>
                   </li>
                   <li>
-                    <a href="#" onClick={(e) => { e.preventDefault(); setIsRegistering(!isRegistering); }}>
+                    <a href="#register" onClick={(e) => { e.preventDefault(); setIsRegistering(!isRegistering); }}>
                       <i className={isRegistering ? "fal fa-sign-in" : "fal fa-user-plus"}></i>
                       {isRegistering ? " Switch to Login" : " Register Account"}
                     </a>

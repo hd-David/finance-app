@@ -9,16 +9,6 @@ const SellStock = ({ userToken, updateBalance }) => {
     const [message, setMessage] = useState({ type: '', text: '' });
     const [currentPrice, setCurrentPrice] = useState(null);
 
-    useEffect(() => {
-        fetchHoldings();
-    }, [userToken]);
-
-    useEffect(() => {
-        if (selectedSymbol) {
-            fetchCurrentPrice(selectedSymbol);
-        }
-    }, [selectedSymbol]);
-
     const fetchHoldings = async () => {
         setFetchingHoldings(true);
         try {
@@ -65,6 +55,18 @@ const SellStock = ({ userToken, updateBalance }) => {
             console.error('Price fetch error:', err);
         }
     };
+
+    useEffect(() => {
+        fetchHoldings();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [userToken]);
+
+    useEffect(() => {
+        if (selectedSymbol) {
+            fetchCurrentPrice(selectedSymbol);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedSymbol]);
 
     const handleSell = async (e) => {
         e.preventDefault();

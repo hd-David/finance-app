@@ -5,10 +5,6 @@ const Dashboard = ({ userToken, cash }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
-    useEffect(() => {
-        fetchPortfolio();
-    }, [userToken]);
-
     const fetchPortfolio = async () => {
         setLoading(true);
         setError('');
@@ -34,6 +30,11 @@ const Dashboard = ({ userToken, cash }) => {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        fetchPortfolio();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [userToken]);
 
     const calculateTotalValue = () => {
         if (!portfolio || !portfolio.holdings) return cash;

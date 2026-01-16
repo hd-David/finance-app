@@ -5,10 +5,6 @@ const History = ({ userToken }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
-    useEffect(() => {
-        fetchHistory();
-    }, [userToken]);
-
     const fetchHistory = async () => {
         setLoading(true);
         setError('');
@@ -34,6 +30,11 @@ const History = ({ userToken }) => {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        fetchHistory();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [userToken]);
 
     const formatDate = (dateString) => {
         const date = new Date(dateString);

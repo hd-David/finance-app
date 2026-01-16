@@ -8,17 +8,6 @@ const BuyStock = ({ userToken, updateBalance }) => {
     const [currentPrice, setCurrentPrice] = useState(null);
     const [fetchingPrice, setFetchingPrice] = useState(false);
 
-    useEffect(() => {
-        if (symbol && symbol.length >= 1) {
-            const timer = setTimeout(() => {
-                fetchPrice();
-            }, 800);
-            return () => clearTimeout(timer);
-        } else {
-            setCurrentPrice(null);
-        }
-    }, [symbol]);
-
     const fetchPrice = async () => {
         if (!symbol.trim()) return;
         
@@ -45,6 +34,18 @@ const BuyStock = ({ userToken, updateBalance }) => {
             setFetchingPrice(false);
         }
     };
+
+    useEffect(() => {
+        if (symbol && symbol.length >= 1) {
+            const timer = setTimeout(() => {
+                fetchPrice();
+            }, 800);
+            return () => clearTimeout(timer);
+        } else {
+            setCurrentPrice(null);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [symbol]);
 
     const handleBuy = async (e) => {
         e.preventDefault();
