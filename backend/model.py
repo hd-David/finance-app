@@ -1,86 +1,64 @@
-from sqlalchemy import create_engine, insert, update, delete, select, UniqueConstraint,DateTime, join
-from sqlalchemy import Table, Column,Integer, String, ForeignKey,Numeric, MetaData,Float, func 
+from sqlalchemy import String, ForeignKey, Float, DateTime, func, Numeric, CheckConstraint
+from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase, relationship, sessionmaker
+from sqlalchemy import create_engine
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
-from sqlalchemy.orm import  Mapped,mapped_column, DeclarativeBase, relationship
-import sqlite3
+from typing import List
 import os
-from typing import Optional, List
-from sqlalchemy.orm import sessionmaker
-
-
-
-
-# Now you can use the sqlite3 module and its functionality in your code
 
 class Base(DeclarativeBase):
     pass
 
-print(Base)
-# Define the user model
 class User(Base):
     __tablename__ = "user"
 
-    id = mapped_column(Integer, primary_key=True)
-    full_names = mapped_column(String(255))
-    username = mapped_column(String(255))
-    create_date: Mapped[datetime] = mapped_column(insert_default=func.now())
-    password_hash = mapped_column(String(1000))
-    addresses: Mapped[List["Address"]] = relationship(back_populates="user")
-    portfolio: Mapped["Portfolio"] = relationship(back_populates="user")
-    cash: Mapped[int] = mapped_column(insert_default=10000)
-    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    full_names: Mapped[str] = mapped_column(String(255))
+    username: Mapped[str] = mapped_column(String(255), unique=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(1000))
+    cash: Mapped[float] = mapped_column(Numeric(15, 2), insert_default=10000.00)
+    create_date: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    # Relationships
+    portfolio: Mapped[List["Portfolio"]] = relationship(back_populates="user")
     
-    def is_authenticated(self):
-        return True
-
-    def is_active(self):
-        return True
-
-    def is_anonymous(self):
-        return False
-
-    def get_id(self):
-        return self.id
- 
+    __table_args__ = (
+        # Basic DB-level check to ensure email has an '@'
+        CheckConstraint("email LIKE '%@%'", name="user_email_check"),
+    )
     @property
     def password(self):
         raise AttributeError('password is not a readable attribute')
- 
+
     @password.setter
     def password(self, password):
+        # This MUST set the actual column name 'password_hash'
         self.password_hash = generate_password_hash(password)
 
     def verify_password(self, password):
         return check_password_hash(self.password_hash, password)
 
-class Address(Base):
-    __tablename__ = "address"
-
-    id = mapped_column(Integer, primary_key=True)
-    user_id = mapped_column(ForeignKey("user.id"))
-    user: Mapped["User"] = relationship(back_populates="addresses")
- 
-
-
 class Portfolio(Base):
     __tablename__ = 'portfolio'
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('user.id'))
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey('user.id'))
+    symbol: Mapped[str] = mapped_column(String(15))
+    quantity: Mapped[int] = mapped_column()
+    price: Mapped[float] = mapped_column(Numeric(10, 2)) # Purchase price
+
     user: Mapped["User"] = relationship(back_populates="portfolio")
-    symbol = Column(String(15))
-    quantity = Column(Integer)
-    price = Column(Float)
 
 class Transaction(Base):
     __tablename__ = 'transactions'
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('user.id'))
-    symbol = Column(String(15))
-    quantity = Column(Integer)
-    price = Column(Float)
-    transaction_type = Column(String(10))  # 'BUY' or 'SELL'
-    timestamp = Column(DateTime, default=func.now())
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey('user.id'))
+    symbol: Mapped[str] = mapped_column(String(15))
+    quantity: Mapped[int] = mapped_column()
+    price: Mapped[float] = mapped_column(Numeric(10, 2))
+    transaction_type: Mapped[str] = mapped_column(String(10)) # 'BUY' or 'SELL'
+    timestamp: Mapped[datetime] = mapped_column(server_default=func.now())
+
 
 
 DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///finance.db')

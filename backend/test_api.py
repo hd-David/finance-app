@@ -1,145 +1,143 @@
-"""
-Simple test script to verify API endpoints are working
-This can be run manually to test the backend API
-"""
+import pytest
+from app import app
+from model import Base, dbconnect, User
+from werkzeug.security import generate_password_hash, check_password_hash
 
-import requests
-import json
+# ======================================================
+# FIXTURES (Setup and Teardown)
+# ======================================================
+from unittest.mock import patch
+import pytest
 
-BASE_URL = "http://localhost:5000"
-
-def test_trending_stocks():
-    """Test the public trending stocks endpoint"""
-    print("\n=== Testing GET /api/trending (Public endpoint) ===")
-    try:
-        response = requests.get(f"{BASE_URL}/api/trending", timeout=10)
-        print(f"Status Code: {response.status_code}")
-        print(f"Response: {json.dumps(response.json(), indent=2)}")
-        return response.status_code == 200
-    except Exception as e:
-        print(f"Error: {e}")
-        return False
-
-def test_register():
-    """Test user registration"""
-    print("\n=== Testing POST /api/register ===")
-    data = {
-        "username": "testuser",
-        "email": "test@example.com",
-        "password": "testpass123",
-        "full_names": "Test User"
-    }
-    try:
-        response = requests.post(f"{BASE_URL}/api/register", json=data, timeout=10)
-        print(f"Status Code: {response.status_code}")
-        print(f"Response: {json.dumps(response.json(), indent=2)}")
-        return response.status_code in [200, 201, 400]  # 400 if already exists
-    except Exception as e:
-        print(f"Error: {e}")
-        return False
-
-def test_login():
-    """Test user login and return token"""
-    print("\n=== Testing POST /api/login ===")
-    data = {
-        "username_or_email": "testuser",
-        "password": "testpass123"
-    }
-    try:
-        response = requests.post(f"{BASE_URL}/api/login", json=data, timeout=10)
-        print(f"Status Code: {response.status_code}")
-        response_data = response.json()
-        print(f"Response: {json.dumps(response_data, indent=2)}")
+@pytest.fixture(autouse=True)
+def mock_lookup():
+    """This stops the tests from calling the real internet"""
+    with patch("app.lookup") as mocked:
+        def side_effect(symbol):
+            if symbol.upper() == "AAPL":
+                return {"symbol": "AAPL", "price": 150.0, "name": "Apple Inc"}
+            if symbol.upper() == "BRK.A":
+                return {"symbol": "BRK.A", "price": 500000.0, "name": "Berkshire"}
+            return None
+        mocked.side_effect = side_effect
+        yield mocked
         
-        if response.status_code == 200:
-            return response_data.get("access_token")
-        return None
-    except Exception as e:
-        print(f"Error: {e}")
-        return None
+        
+@pytest.fixture
+def client():
+    """Configures the app for testing and provides a test client."""
+    app.config['TESTING'] = True
+    # Use a separate test database file so we don't wipe your real data
+    app.config['DATABASE_URL'] = 'sqlite:///test_finance.db'
+    
+    with app.test_client() as client:
+        with app.app_context():
+            db = dbconnect()
+            Base.metadata.drop_all(bind=db.get_bind()) # Clear old test data
+            Base.metadata.create_all(bind=db.get_bind()) # Create fresh tables
+            yield client
+            db.close()
 
-def test_get_user(token):
-    """Test getting user info"""
-    print("\n=== Testing GET /api/user (Authenticated) ===")
-    headers = {"Authorization": f"Bearer {token}"}
-    try:
-        response = requests.get(f"{BASE_URL}/api/user", headers=headers, timeout=10)
-        print(f"Status Code: {response.status_code}")
-        print(f"Response: {json.dumps(response.json(), indent=2)}")
-        return response.status_code == 200
-    except Exception as e:
-        print(f"Error: {e}")
-        return False
+from flask_jwt_extended import create_access_token
 
-def test_get_portfolio(token):
-    """Test getting portfolio"""
-    print("\n=== Testing GET /api/portfolio (Authenticated) ===")
-    headers = {"Authorization": f"Bearer {token}"}
-    try:
-        response = requests.get(f"{BASE_URL}/api/portfolio", headers=headers, timeout=10)
-        print(f"Status Code: {response.status_code}")
-        print(f"Response: {json.dumps(response.json(), indent=2)}")
-        return response.status_code == 200
-    except Exception as e:
-        print(f"Error: {e}")
-        return False
+@pytest.fixture
+def auth_headers(client):
+    """Helper fixture to register/login and return JWT headers."""
+    with app.app_context():
+        db = dbconnect()
+        user = User(
+            username="tester",
+            email="test@example.com",
+            full_names="Test User",
+            # Manually set the hash to bypass the setter issue
+            password_hash=generate_password_hash("Password123!"),
+            cash=10000.0
+        )
+        db.add(user)
+        db.commit()
+        db.commit()
+        db.refresh(user) # Get the generated ID
+        
+        # 2. Generate a token for this specific user ID
+        # Adjust identity=str(user.id) or identity=user.username based on your app.py
+        token = create_access_token(identity=str(user.id))
+        db.close()
+        
+    return {"Authorization": f"Bearer {token}"}
 
-def test_quote(token):
-    """Test stock quote"""
-    print("\n=== Testing POST /api/quote (Authenticated) ===")
-    headers = {"Authorization": f"Bearer {token}"}
-    data = {"symbol": "AAPL", "quantity": 5}
-    try:
-        response = requests.post(f"{BASE_URL}/api/quote", json=data, headers=headers, timeout=10)
-        print(f"Status Code: {response.status_code}")
-        print(f"Response: {json.dumps(response.json(), indent=2)}")
-        return response.status_code == 200
-    except Exception as e:
-        print(f"Error: {e}")
-        return False
+# ======================================================
+# TEST CASES
+# ======================================================
 
-def main():
-    """Run all tests"""
-    print("=" * 60)
-    print("Finance App Backend API Test Suite")
-    print("=" * 60)
-    print("\nNOTE: Make sure the Flask server is running on http://localhost:5000")
-    print("Run: python app.py")
-    
-    input("\nPress Enter to start tests...")
-    
-    results = {}
-    
-    # Test public endpoint
-    results['Trending Stocks'] = test_trending_stocks()
-    
-    # Test registration
-    results['Registration'] = test_register()
-    
-    # Test login and get token
-    token = test_login()
-    results['Login'] = token is not None
-    
-    if token:
-        # Test authenticated endpoints
-        results['Get User'] = test_get_user(token)
-        results['Get Portfolio'] = test_get_portfolio(token)
-        results['Quote Stock'] = test_quote(token)
-    else:
-        print("\n⚠️  Cannot test authenticated endpoints without token")
-    
-    # Print summary
-    print("\n" + "=" * 60)
-    print("TEST SUMMARY")
-    print("=" * 60)
-    for test_name, passed in results.items():
-        status = "✅ PASSED" if passed else "❌ FAILED"
-        print(f"{test_name}: {status}")
-    
-    total = len(results)
-    passed = sum(results.values())
-    print(f"\nTotal: {passed}/{total} tests passed")
-    print("=" * 60)
+def test_register_success(client):
+    """Test that a new user can register."""
+    payload = {
+        "username": "newguy",
+        "email": "new@guy.com",
+        "password": "SecurePassword1!",
+        "full_names": "New Guy"
+    }
+    response = client.post('/api/register', json=payload)
+    assert response.status_code == 201
+    assert response.json['message'] == "User registered successfully"
 
-if __name__ == "__main__":
-    main()
+def test_login_success(client):
+    """Test login returns a valid JWT token."""
+    # First register
+    client.post('/api/register', json={
+        "username": "loginuser",
+        "email": "login@test.com",
+        "password": "Password123!",
+        "full_names": "Login User"
+    })
+    # Then login
+    response = client.post('/api/login', json={
+        "username_or_email": "loginuser",
+        "password": "Password123!"
+    })
+    assert response.status_code == 200
+    assert "access_token" in response.json
+
+def test_get_user_profile(client, auth_headers):
+    """Test fetching protected user data using JWT."""
+    response = client.get('/api/user', headers=auth_headers)
+    assert response.status_code == 200
+    assert response.json['username'] == "tester"
+
+def test_quote_valid_symbol(client, auth_headers):
+    """Test stock lookup with a real symbol."""
+    response = client.post('/api/quote', 
+                           json={"symbol": "AAPL"}, 
+                           headers=auth_headers)
+    assert response.status_code == 200
+    assert response.json['symbol'] == "AAPL"
+    assert "price" in response.json
+
+def test_buy_stock_success(client, auth_headers):
+    """Test purchasing a stock correctly updates balance."""
+    # Assuming user starts with 10,000 cash
+    buy_payload = {"symbol": "AAPL", "quantity": 2}
+    response = client.post('/api/buy', json=buy_payload, headers=auth_headers)
+    
+    assert response.status_code == 200
+    assert response.json['message'] == "BUY successful"
+    
+    # Verify portfolio state
+    port_res = client.get('/api/portfolio', headers=auth_headers)
+    assert len(port_res.json['portfolio']) == 1
+    assert port_res.json['portfolio'][0]['symbol'] == "AAPL"
+
+def test_trending_public(client):
+    """Test that the trending endpoint is public (no headers needed)."""
+    response = client.get('/api/trending')
+    assert response.status_code == 200
+    assert "stocks" in response.json
+    assert isinstance(response.json['stocks'], list)
+
+def test_insufficient_funds(client, auth_headers):
+    """Test that a user cannot buy more than they can afford."""
+    # Attempt to buy 1 million shares of Berkshire Hathaway
+    payload = {"symbol": "BRK.A", "quantity": 15000}  # Assuming this exceeds available cash
+    response = client.post('/api/buy', json=payload, headers=auth_headers)
+    assert response.status_code == 400
+    assert response.json['error'] == "Insufficient funds"
