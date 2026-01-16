@@ -6,7 +6,8 @@ const Register = ({ onFinished }) => {
         username: "",
         email: "", // New field
         password: "",
-        confirmation: ""
+        confirmation: "",
+        full_names: ""
     });
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState({ type: '', msg: '' });
@@ -53,7 +54,7 @@ const Register = ({ onFinished }) => {
                 <div className="form-group">
                     <label className="form-label">Full Name</label>
                     <input 
-                        type="tex" 
+                        type="text" 
                         className="form-control" 
                         placeholder="Joe Doe"
                         value={formData.full_names}

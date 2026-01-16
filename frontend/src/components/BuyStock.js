@@ -1,10 +1,51 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const BuyStock = ({ userToken, updateBalance }) => {
     const [symbol, setSymbol] = useState("");
     const [quantity, setQuantity] = useState(1);
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState({ type: '', text: '' });
+    const [currentPrice, setCurrentPrice] = useState(null);
+    const [fetchingPrice, setFetchingPrice] = useState(false);
+
+    const fetchPrice = async () => {
+        if (!symbol.trim()) return;
+        
+        setFetchingPrice(true);
+        try {
+            const response = await fetch('http://localhost:5000/api/quote', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${userToken}`
+                },
+                body: JSON.stringify({ symbol: symbol.trim().toUpperCase() })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                setCurrentPrice(data.price);
+            } else {
+                setCurrentPrice(null);
+            }
+        } catch (err) {
+            setCurrentPrice(null);
+        } finally {
+            setFetchingPrice(false);
+        }
+    };
+
+    useEffect(() => {
+        if (symbol && symbol.length >= 1) {
+            const timer = setTimeout(() => {
+                fetchPrice();
+            }, 800);
+            return () => clearTimeout(timer);
+        } else {
+            setCurrentPrice(null);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [symbol]);
 
     const handleBuy = async (e) => {
         e.preventDefault();
@@ -45,6 +86,8 @@ const BuyStock = ({ userToken, updateBalance }) => {
         }
     };
 
+    const estimatedCost = currentPrice && quantity > 0 ? (currentPrice * quantity).toFixed(2) : null;
+
     return (
         <div className="p-3">
             {message.text && (
@@ -68,6 +111,28 @@ const BuyStock = ({ userToken, updateBalance }) => {
                     <span className="help-block">Enter the ticker symbol of the company.</span>
                 </div>
 
+                {currentPrice && (
+                    <div className="alert alert-light border mb-3">
+                        <div className="row">
+                            <div className="col-6">
+                                <small className="text-muted d-block">Current Price</small>
+                                <strong className="text-success">${parseFloat(currentPrice).toFixed(2)}</strong>
+                            </div>
+                            <div className="col-6">
+                                <small className="text-muted d-block">Symbol</small>
+                                <strong>{symbol.toUpperCase()}</strong>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {fetchingPrice && !currentPrice && (
+                    <div className="alert alert-info mb-3">
+                        <span className="spinner-border spinner-border-sm mr-2"></span>
+                        Fetching current price...
+                    </div>
+                )}
+
                 <div className="form-group">
                     <label className="form-label" htmlFor="quantity">Quantity</label>
                     <input 
@@ -80,6 +145,17 @@ const BuyStock = ({ userToken, updateBalance }) => {
                         required
                     />
                 </div>
+
+                {estimatedCost && (
+                    <div className="alert alert-secondary">
+                        <div className="d-flex justify-content-between align-items-center">
+                            <span>Estimated Total Cost:</span>
+                            <strong className="h5 mb-0 text-primary">
+                                ${estimatedCost}
+                            </strong>
+                        </div>
+                    </div>
+                )}
 
                 <div className="row no-gutters">
                     <div className="col-md-12 ml-auto text-right">
