@@ -10,7 +10,8 @@ const Register = () => {
         username: "",
         email: "", 
         password: "",
-        confirmation: ""
+        confirmation: "",
+        full_names: ""
     });
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState({ type: '', msg: '' });
