@@ -120,12 +120,12 @@ def test_buy_stock_success(client, auth_headers):
     response = client.post('/api/buy', json=buy_payload, headers=auth_headers)
     
     assert response.status_code == 200
-    assert response.json['message'] == "BUY successful"
+    assert response.json['message'] == "Purchase successful"
     
     # Verify portfolio state
     port_res = client.get('/api/portfolio', headers=auth_headers)
-    assert len(port_res.json['portfolio']) == 1
-    assert port_res.json['portfolio'][0]['symbol'] == "AAPL"
+    assert len(port_res.json['holdings']) == 1
+    assert port_res.json['holdings'][0]['symbol'] == "AAPL"
 
 def test_trending_public(client):
     """Test that the trending endpoint is public (no headers needed)."""

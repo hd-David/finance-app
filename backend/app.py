@@ -3,7 +3,7 @@ import os
 from flask import Flask, request, jsonify
 from helpers import *
 from create import *
-from model import dbconnect, User, Transaction, Portfolio,init_db
+from model import dbconnect, User, Transaction, Portfolio
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from datetime import timedelta
@@ -159,33 +159,51 @@ def portfolio_to_dict(holding):
 @app.route('/api/portfolio', methods=['GET'])
 @jwt_required()
 def get_portfolio():
-    user_id = get_jwt_identity()
-    user = session_db.get(User, int(user_id))
+    raw_identity = get_jwt_identity()
+    try:
+        user_id = int(raw_identity)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid user identity"}), 401
     
-    # Check your database query for the user's stocks
-    # Ensure it returns a list of objects with "symbol", "quantity", and "price"
-    user_stocks = session_db.query(Portfolio).filter_by(user_id=user_id).all()
+    user = session_db.get(User, user_id)
     
-    holdings = []
-    for s in user_stocks:
-        holdings.append({
-            "symbol": s.symbol,
-            "quantity": s.quantity,     # <--- Must match React!
-            "price": float(s.price)     # <--- Must match React!
-        })
+    if not user:
+        return jsonify({"error": "User not found"}), 404
     
-    total_stock_value = sum(h['quantity'] * h['price'] for h in holdings)
+    try:
+        # Check your database query for the user's stocks
+        # Ensure it returns a list of objects with "symbol", "quantity", and "price"
+        user_stocks = session_db.query(Portfolio).filter_by(user_id=user_id).all()
+        
+        holdings = []
+        for s in user_stocks:
+            holdings.append({
+                "symbol": s.symbol,
+                "quantity": s.quantity,     # <--- Must match React!
+                "price": float(s.price)     # <--- Must match React!
+            })
+        
+        total_stock_value = sum(h['quantity'] * h['price'] for h in holdings)
 
-    return jsonify({
-        "holdings": holdings,
-        "total_value": float(user.cash) + total_stock_value,
-        "cash": float(user.cash)
-    })
+        return jsonify({
+            "holdings": holdings,
+            "total_value": float(user.cash) + total_stock_value,
+            "cash": float(user.cash)
+        })
+    except Exception as e:
+        app.logger.error(f"Error fetching portfolio for user {user_id}: {str(e)}")
+        return jsonify({"error": "Failed to fetch portfolio"}), 500
 
 
 @app.route("/api/quote", methods=["POST"])
 @jwt_required()
 def api_quote():
+    raw_identity = get_jwt_identity()
+    try:
+        user_id = int(raw_identity)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid user identity"}), 401
+    
     data = request.get_json()
 
     if not data or 'symbol' not in data:
@@ -224,7 +242,7 @@ def buy_for_user(user_id, symbol, quantity):
     if not user:
         return "User not found"
 
-   # Convert everything to Decimal
+    # Convert everything to Decimal
     current_cash = Decimal(user.cash)
     unit_price = Decimal(str(stock_info["price"]))
     total_cost = unit_price * quantity
@@ -277,7 +295,13 @@ def api_buy():
     result = buy_for_user(user_id, data["symbol"], data["quantity"])
 
     if result == "success":
-        return jsonify({"message": "Purchase successful"}), 200
+        # Fetch the updated user to get the new cash balance
+        user = session_db.get(User, user_id)
+        new_balance = float(user.cash) if user and user.cash is not None else None
+        return jsonify({
+            "message": "Purchase successful",
+            "new_balance": new_balance
+        }), 200
     else:
         return jsonify({"error": result}), 400
 
@@ -289,7 +313,6 @@ def api_sell():
     """API endpoint to sell stocks"""
     user_id = get_jwt_identity()
     data = request.get_json()
-    print(f"DEBUG: Received symbol to sell: '{data['symbol']}'")
     
     if not data or 'symbol' not in data or 'quantity' not in data:
         return jsonify({"error": "Symbol and quantity required"}), 400
@@ -300,7 +323,7 @@ def api_sell():
     # Call existing sell function
     result = sell_for_user(user_id, symbol, quantity)
     
-    if result == "Success":
+    if result == "success":
         return jsonify({"message": "Stock sold successfully"}), 200
     else:
         return jsonify({"error": result}), 400
@@ -309,7 +332,11 @@ def api_sell():
 @jwt_required()
 def api_history():
     """API endpoint to get transaction history"""
-    user_id = get_jwt_identity()
+    raw_identity = get_jwt_identity()
+    try:
+        user_id = int(raw_identity)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid user identity"}), 401
     
     # Get all transactions for the user
     transactions = session_db.query(Transaction).filter_by(user_id=user_id).order_by(Transaction.timestamp.desc()).all()
@@ -338,7 +365,12 @@ def api_trending():
 @jwt_required()
 def api_get_user():
     """API endpoint to get current user info"""
-    user_id = get_jwt_identity()
+    raw_identity = get_jwt_identity()
+    try:
+        user_id = int(raw_identity)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid user identity"}), 401
+    
     user = session_db.query(User).get(user_id)
     
     if not user:
@@ -400,7 +432,7 @@ def sell_for_user(user_id, symbol, quantity):
     session_db.add(transaction)
     session_db.commit()
     
-    return "Success"
+    return "success"
 @app.route("/api/market-snapshot")
 def get_market_snapshot():
     symbols = ["AAPL", "TSLA", "MSFT", "IBM", "GOOGL"]
@@ -415,12 +447,18 @@ def get_market_snapshot():
     market_data = []
 
     for symbol in symbols:
-        price = lookup(symbol)
+        stock_info = lookup(symbol)
+        
+        # Extract numeric price from lookup result (dict or direct value)
+        if isinstance(stock_info, dict):
+            price = stock_info.get("price")
+        else:
+            price = stock_info
         
         # If API returns 0 or None, use our mock_data
-        if not price or price == 0:
+        if price is None or price == 0:
             price = mock_data.get(symbol, 100.00)
-            print(f"⚠️ API Limit hit for {symbol}. Using mock price: {price}")
+            app.logger.warning(f"API Limit hit for {symbol}. Using mock price: {price}")
 
         market_data.append({
             "symbol": symbol,
