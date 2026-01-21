@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom'; // 1. Added import
 
 const Login = ({ setToken, onRegisterClick }) => {
     const [creds, setCreds] = useState({ username: "", password: "" });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    
+    const navigate = useNavigate(); // 2. Initialized the navigation hook
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -14,7 +17,6 @@ const Login = ({ setToken, onRegisterClick }) => {
             const response = await fetch('http://localhost:5000/api/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                // FIX: Map 'username' to 'username_or_email' for the backend
                 body: JSON.stringify({
                     username_or_email: creds.username,
                     password: creds.password
@@ -26,8 +28,10 @@ const Login = ({ setToken, onRegisterClick }) => {
             if (response.ok) {
                 localStorage.setItem('token', data.access_token);
                 setToken(data.access_token);
+                
+                // 3. This line pushes the user to the dashboard route 🏎️
+                navigate('/dashboard'); 
             } else {
-                // Shows the "Invalid credentials" or "Missing..." error from Flask
                 setError(data.error || "Invalid username or password");
             }
         } catch (err) {

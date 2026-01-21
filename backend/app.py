@@ -1,8 +1,9 @@
+from decimal import Decimal
 import os
 from flask import Flask, request, jsonify
 from helpers import *
 from create import *
-from model import dbconnect, User, Transaction, Portfolio
+from model import dbconnect, User, Transaction, Portfolio,init_db
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from datetime import timedelta
@@ -125,7 +126,7 @@ def api_login():
         return jsonify({"error": "Invalid credentials"}), 401
     
     # Create JWT token
-    access_token = create_access_token(identity=user.id)
+    access_token = create_access_token(identity = str(user.id))
     
     return jsonify({
         "message": "Login successful",
@@ -146,31 +147,40 @@ def api_logout():
     # JWT tokens are stateless, so we just return success
     # The frontend should remove the token
     return jsonify({"message": "Logout successful"}), 200
+# Helper to convert DB objects to dictionaries
+def portfolio_to_dict(holding):
+    return {
+        "symbol": holding.symbol,
+        "shares": holding.shares,
+        "price": float(holding.current_price), # Convert Decimal for JSON
+        "total_value": float(holding.shares * holding.current_price)
+    }
 
-@app.route("/api/portfolio", methods=["GET"])
+@app.route('/api/portfolio', methods=['GET'])
 @jwt_required()
-def api_get_portfolio():
-    """API endpoint to get user's portfolio"""
+def get_portfolio():
     user_id = get_jwt_identity()
+    user = session_db.get(User, int(user_id))
     
-    # Get portfolio data
-    portfolio_data = get_portfolio_data(user_id)
+    # Check your database query for the user's stocks
+    # Ensure it returns a list of objects with "symbol", "quantity", and "price"
+    user_stocks = session_db.query(Portfolio).filter_by(user_id=user_id).all()
     
-    # Get user's cash
-    user = session_db.query(User).get(user_id)
-    if not user:
-        return jsonify({"error": "User not found"}), 404
+    holdings = []
+    for s in user_stocks:
+        holdings.append({
+            "symbol": s.symbol,
+            "quantity": s.quantity,     # <--- Must match React!
+            "price": float(s.price)     # <--- Must match React!
+        })
     
-    # Calculate totals
-    stock_value = sum(stock['total_value'] for stock in portfolio_data)
-    grand_total = stock_value + user.cash
-    
+    total_stock_value = sum(h['quantity'] * h['price'] for h in holdings)
+
     return jsonify({
-        "portfolio": portfolio_data,
-        "cash": float(user.cash),
-        "stock_value": float(stock_value),
-        "total": float(grand_total)
-    }), 200
+        "holdings": holdings,
+        "total_value": float(user.cash) + total_stock_value,
+        "cash": float(user.cash)
+    })
 
 
 @app.route("/api/quote", methods=["POST"])
@@ -197,74 +207,80 @@ def api_quote():
     
     
 # HELPER FUNCTIONS FOR API ENDPOINTS
-def buy(symbol, quantity):
+def buy_for_user(user_id, symbol, quantity):
     stock_info = lookup(symbol)
     if stock_info is None:
         return "Invalid symbol"
-    
+
     try:
         quantity = int(quantity)
         if quantity <= 0:
             return "Quantity must be positive"
-    except ValueError:
+    except (ValueError, TypeError):
         return "Invalid quantity"
-    
-    # 1. Use session_db.get() to remove the LegacyAPIWarning
-    user = session_db.get(User, user.id)
-    
-    # 2. Convert to float to avoid TypeError in tests
-    current_cash = float(user.cash)
-    unit_price = float(stock_info["price"])
+
+    # Correct user lookup
+    user = session_db.get(User, user_id)
+    if not user:
+        return "User not found"
+
+   # Convert everything to Decimal
+    current_cash = Decimal(user.cash)
+    unit_price = Decimal(str(stock_info["price"]))
     total_cost = unit_price * quantity
-    
+
     if total_cost > current_cash:
         return "Insufficient funds"
-    
-    # 3. Apply the subtraction
-    user.cash = current_cash - total_cost
-    
-    # Portfolio logic... (Keep your existing logic below this)
-    existing_portfolio = session_db.query(Portfolio).filter_by(user_id=user.id, symbol=symbol).first()
+
+    # Deduct cash
+    user.cash = current_cash - Decimal(str(total_cost))
+    # Portfolio logic
+    existing_portfolio = session_db.query(Portfolio).filter_by(
+        user_id=user.id, symbol=symbol
+    ).first()
+
     if existing_portfolio:
         existing_portfolio.quantity += quantity
         existing_portfolio.price = unit_price
     else:
-        portfolio = Portfolio(user_id=user.id, symbol=symbol, quantity=quantity, price=unit_price)
+        portfolio = Portfolio(
+            user_id=user.id,
+            symbol=symbol,
+            quantity=quantity,
+            price=unit_price
+        )
         session_db.add(portfolio)
-    
-    # Record the transaction
+
+    # Record transaction
     transaction = Transaction(
         user_id=user.id,
         symbol=symbol,
         quantity=quantity,
         price=unit_price,
-        transaction_type='BUY'
+        transaction_type="BUY"
     )
     session_db.add(transaction)
+
     session_db.commit()
-   
-    return "Success"
-    
+
+    return "success"
+
 @app.route("/api/buy", methods=["POST"])
 @jwt_required()
 def api_buy():
-    """The endpoint your frontend/tests talk to."""
-    user_id = get_jwt_identity() 
+    user_id = int(get_jwt_identity())  # IMPORTANT
     data = request.get_json()
-    
-    if not data or 'symbol' not in data or 'quantity' not in data:
+
+    if not data or "symbol" not in data or "quantity" not in data:
         return jsonify({"error": "Missing symbol or quantity"}), 400
 
-    # Call the fixed helper
-    result = buy_for_user(user_id, data['symbol'], data['quantity'])
+    result = buy_for_user(user_id, data["symbol"], data["quantity"])
 
     if result == "success":
-        # Return 200 for React success
         return jsonify({"message": "Purchase successful"}), 200
     else:
-        # Return 400 with the specific error (e.g., "Insufficient funds") 
-        # This matches what your pytest: assert response.json['error'] == "..."
         return jsonify({"error": result}), 400
+
     
     
 @app.route("/api/sell", methods=["POST"])
@@ -273,6 +289,7 @@ def api_sell():
     """API endpoint to sell stocks"""
     user_id = get_jwt_identity()
     data = request.get_json()
+    print(f"DEBUG: Received symbol to sell: '{data['symbol']}'")
     
     if not data or 'symbol' not in data or 'quantity' not in data:
         return jsonify({"error": "Symbol and quantity required"}), 400
@@ -335,54 +352,6 @@ def api_get_user():
         "cash": float(user.cash)
     }), 200
 
-# Helper functions for API endpoints
-def buy_for_user(user_id, symbol, quantity):
-    """Buy stocks for a specific user (used by API)"""
-    stock_info = lookup(symbol)
-    if stock_info is None:
-        return "Invalid symbol"
-    
-    # Validate quantity
-    try:
-        quantity = int(quantity)
-        if quantity <= 0:
-            return "Quantity must be positive"
-    except ValueError:
-        return "Invalid quantity"
-    
-    user = session_db.query(User).get(user_id)
-    if not user:
-        return "User not found"
-    
-    budget = user.cash
-    if stock_info["price"] * quantity > budget:
-        return "Insufficient funds"
-    
-    # Purchase stock
-    total_cost = stock_info["price"] * quantity
-    user.cash -= total_cost
-    
-    # Check if user already owns this stock
-    existing_portfolio = session_db.query(Portfolio).filter_by(user_id=user.id, symbol=symbol).first()
-    if existing_portfolio:
-        existing_portfolio.quantity += quantity
-        existing_portfolio.price = stock_info["price"]
-    else:
-        portfolio = Portfolio(user_id=user.id, symbol=symbol, quantity=quantity, price=stock_info["price"])
-        session_db.add(portfolio)
-    
-    # Record transaction
-    transaction = Transaction(
-        user_id=user.id,
-        symbol=symbol,
-        quantity=quantity,
-        price=stock_info["price"],
-        transaction_type='BUY'
-    )
-    session_db.add(transaction)
-    session_db.commit()
-    
-    return "Success"
 
 def sell_for_user(user_id, symbol, quantity):
     """Sell shares of stock for a specific user (used by API)"""
@@ -412,7 +381,7 @@ def sell_for_user(user_id, symbol, quantity):
         return "Invalid symbol"
     
     # Sell stock
-    total_revenue = stock_info["price"] * quantity
+    total_revenue = Decimal(stock_info["price"]) * Decimal(quantity)
     user.cash += total_revenue
     
     # Update portfolio
@@ -432,7 +401,33 @@ def sell_for_user(user_id, symbol, quantity):
     session_db.commit()
     
     return "Success"
+@app.route("/api/market-snapshot")
+def get_market_snapshot():
+    symbols = ["AAPL", "TSLA", "MSFT", "IBM", "GOOGL"]
+    # 🟢 High-end fallback data to use when API is blocked
+    mock_data = {
+        "AAPL": 185.92, 
+        "TSLA": 171.05, 
+        "MSFT": 415.50, 
+        "IBM": 190.20, 
+        "GOOGL": 154.30
+    }
+    market_data = []
 
+    for symbol in symbols:
+        price = lookup(symbol)
+        
+        # If API returns 0 or None, use our mock_data
+        if not price or price == 0:
+            price = mock_data.get(symbol, 100.00)
+            print(f"⚠️ API Limit hit for {symbol}. Using mock price: {price}")
+
+        market_data.append({
+            "symbol": symbol,
+            "price": price
+        })
+    
+    return jsonify(market_data)
 # ============================================
 # END OF REST API ENDPOINTS
 # ============================================

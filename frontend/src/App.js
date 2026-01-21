@@ -6,42 +6,51 @@ import Quote from './components/Quote';
 import History from './components/History';
 import Login from './components/Login';
 import Register from './components/Register';
+import BuyStock from './components/BuyStock';
+import Dashboard from './components/Dashboard'; 
+import SellStock from './components/SellStock';
+import History from './components/History';
+import LandingPage from './components/LandingPage';
+
 
 function App() {
-  // 1. Core State
+  // 1. Core State 💾
   const [token, setToken] = useState(localStorage.getItem('token'));
-  const [isRegistering, setIsRegistering] = useState(false);
   const [cash, setCash] = useState(0);
   const [username, setUsername] = useState("Guest");
   const [currentView, setCurrentView] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // 2. Fetch User Profile (Balance & Name) whenever the token changes
-  useEffect(() => {
-    if (token) {
-      fetch('http://localhost:5000/api/user/profile', {
-        headers: { 
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        }
-      })
-      .then(res => {
-        if (!res.ok) throw new Error("Unauthorized");
-        return res.json();
-      })
-      .then(data => {
-        setCash(data.cash);
-        setUsername(data.username);
-      })
-      .catch(err => {
-        console.error("Profile fetch error:", err);
-        // If token is invalid/expired, log out the user
-        handleLogout();
-      });
-    }
-  }, [token]);
+  // 2. Profile Sync 🔄
+ useEffect(() => {
+  if (!token) return;
 
-  // 3. Actions
+  fetch('http://localhost:5000/api/user', {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
+  })
+  .then(res =>
+    res.json().then(data => {
+      if (!res.ok) {
+        console.error("User API error:", data);
+        throw new Error(data.msg || "Profile fetch failed");
+      }
+      return data;
+    })
+  )
+  .then(data => {
+    setCash(data.cash);
+    setUsername(data.username);
+  })
+  .catch(err => {
+    console.error("Profile fetch error:", err.message);
+  });
+}, [token]);
+
+
+  // 3. Actions ⚡
   const handleLogout = () => {
     localStorage.removeItem('token');
     setToken(null);

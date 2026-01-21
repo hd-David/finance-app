@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom'; // 1. Added import
 
-const Register = ({ onFinished }) => {
-    // 1. Add email to the state object
+const Register = () => {
+    // 2. Initialize the navigation hook
+    const navigate = useNavigate();
+
     const [formData, setFormData] = useState({
+        full_names: "", 
         username: "",
-        email: "", // New field
+        email: "", 
         password: "",
         confirmation: "",
         full_names: ""
@@ -27,7 +31,6 @@ const Register = ({ onFinished }) => {
             const response = await fetch('http://localhost:5000/api/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                // 2. Include email in the JSON body
                 body: JSON.stringify(formData) 
             });
 
@@ -35,7 +38,11 @@ const Register = ({ onFinished }) => {
 
             if (response.ok) {
                 setStatus({ type: 'success', msg: 'Account created! Redirecting to login...' });
-                setTimeout(() => { onFinished(); }, 2000);
+                
+                // 3. Redirect to login after 2 seconds so the user can see the success message 🏎️
+                setTimeout(() => { 
+                    navigate('/login'); 
+                }, 2000);
             } else {
                 setStatus({ type: 'danger', msg: data.error || 'Registration failed' });
             }
@@ -73,7 +80,6 @@ const Register = ({ onFinished }) => {
                     />
                 </div>
 
-                {/* 3. NEW EMAIL FIELD */}
                 <div className="form-group">
                     <label className="form-label">Email Address</label>
                     <input 
