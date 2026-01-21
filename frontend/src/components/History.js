@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
 const History = ({ userToken }) => {
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -10,7 +12,7 @@ const History = ({ userToken }) => {
         setError('');
 
         try {
-            const response = await fetch('http://localhost:5000/api/history', {
+            const response = await fetch(`${API_BASE_URL}/api/history`, {
                 headers: {
                     'Authorization': `Bearer ${userToken}`,
                     'Content-Type': 'application/json'

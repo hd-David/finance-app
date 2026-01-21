@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
 const BuyStock = ({ userToken, updateBalance }) => {
     const [symbol, setSymbol] = useState("");
     const [quantity, setQuantity] = useState(1);
@@ -13,7 +15,7 @@ const BuyStock = ({ userToken, updateBalance }) => {
         
         setFetchingPrice(true);
         try {
-            const response = await fetch('http://localhost:5000/api/quote', {
+            const response = await fetch(`${API_BASE_URL}/api/quote`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -53,7 +55,7 @@ const BuyStock = ({ userToken, updateBalance }) => {
         setMessage({ type: '', text: '' });
 
         try {
-            const response = await fetch('http://localhost:5000/api/buy', {
+            const response = await fetch(`${API_BASE_URL}/api/buy`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

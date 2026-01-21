@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
 const Dashboard = ({ userToken, cash }) => {
     const [portfolio, setPortfolio] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -10,7 +12,7 @@ const Dashboard = ({ userToken, cash }) => {
         setError('');
         
         try {
-            const response = await fetch('http://localhost:5000/api/portfolio', {
+            const response = await fetch(`${API_BASE_URL}/api/portfolio`, {
                 headers: {
                     'Authorization': `Bearer ${userToken}`,
                     'Content-Type': 'application/json'
@@ -141,13 +143,13 @@ const Dashboard = ({ userToken, cash }) => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {portfolio.holdings.map((holding, index) => {
+                                    {portfolio.holdings.map((holding) => {
                                         const gainLoss = calculateGainLoss(holding);
                                         const gainLossPercent = ((holding.current_price - holding.avg_price) / holding.avg_price) * 100;
                                         const isPositive = gainLoss >= 0;
                                         
                                         return (
-                                            <tr key={index}>
+                                            <tr key={holding.symbol}>
                                                 <td>
                                                     <strong>{holding.symbol}</strong>
                                                     {holding.name && <div className="small text-muted">{holding.name}</div>}

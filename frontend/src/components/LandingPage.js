@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import StockTicker from './StockTicker';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
 const LandingPage = ({ token }) => {
   const [marketData, setMarketData] = useState([]);
   const [latency, setLatency] = useState(12);
 
   useEffect(() => {
     // 1. Fetch real Alpha Vantage data from your backend proxy
-    fetch('http://localhost:5000/api/market-snapshot')
+    fetch(`${API_BASE_URL}/api/market-snapshot`)
       .then(res => res.json())
       .then(data => setMarketData(data))
       .catch(err => console.error("Error fetching market data:", err));
@@ -75,11 +77,11 @@ const LandingPage = ({ token }) => {
               <ul className="list-unstyled">
                 {/* 🚀 THE CRITICAL FIX: Mapping through marketData defines 'stock' */}
                 {marketData && marketData.length > 0 ? (
-                  marketData.map((stock, index) => {
+                  marketData.map((stock) => {
                     // Define 'price' inside the loop so it's not "undefined"
 
                     return (
-                      <li key={index} className="mb-4 border-bottom border-dark pb-2">
+                      <li key={stock.symbol} className="mb-4 border-bottom border-dark pb-2">
                         <small className="d-block text-muted text-uppercase">{stock.symbol}</small>
                         <span className="fs-4">
                           {!isNaN(stock.price) && stock.price > 0 ? (
