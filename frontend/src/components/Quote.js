@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
 const Quote = ({ userToken }) => {
     const [symbol, setSymbol] = useState("");
     const [quote, setQuote] = useState(null);
@@ -13,7 +15,7 @@ const Quote = ({ userToken }) => {
         setQuote(null);
 
         try {
-            const response = await fetch('http://localhost:5000/api/quote', {
+            const response = await fetch(`${API_BASE_URL}/api/quote`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

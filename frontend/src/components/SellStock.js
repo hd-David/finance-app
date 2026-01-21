@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
 const SellStock = ({ userToken, updateBalance }) => {
     const [holdings, setHoldings] = useState([]);
     const [selectedSymbol, setSelectedSymbol] = useState("");
@@ -12,7 +14,7 @@ const SellStock = ({ userToken, updateBalance }) => {
     const fetchHoldings = async () => {
         setFetchingHoldings(true);
         try {
-            const response = await fetch('http://localhost:5000/api/portfolio', {
+            const response = await fetch(`${API_BASE_URL}/api/portfolio`, {
                 headers: {
                     'Authorization': `Bearer ${userToken}`,
                     'Content-Type': 'application/json'
@@ -38,7 +40,7 @@ const SellStock = ({ userToken, updateBalance }) => {
 
     const fetchCurrentPrice = async (symbol) => {
         try {
-            const response = await fetch('http://localhost:5000/api/quote', {
+            const response = await fetch(`${API_BASE_URL}/api/quote`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${userToken}`,
@@ -74,7 +76,7 @@ const SellStock = ({ userToken, updateBalance }) => {
         setMessage({ type: '', text: '' });
 
         try {
-            const response = await fetch('http://localhost:5000/api/sell', {
+            const response = await fetch(`${API_BASE_URL}/api/sell`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

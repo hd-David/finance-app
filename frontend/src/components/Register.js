@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom'; // 1. Added import
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
 const Register = () => {
     // 2. Initialize the navigation hook
     const navigate = useNavigate();
@@ -28,7 +30,7 @@ const Register = () => {
         setStatus({ type: '', msg: '' });
 
         try {
-            const response = await fetch('http://localhost:5000/api/register', {
+            const response = await fetch(`${API_BASE_URL}/api/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData) 

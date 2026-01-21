@@ -6,12 +6,9 @@ import Quote from './components/Quote';
 import History from './components/History';
 import Login from './components/Login';
 import Register from './components/Register';
-import BuyStock from './components/BuyStock';
-import Dashboard from './components/Dashboard'; 
-import SellStock from './components/SellStock';
-import History from './components/History';
 import LandingPage from './components/LandingPage';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 function App() {
   // 1. Core State 💾
@@ -20,12 +17,13 @@ function App() {
   const [username, setUsername] = useState("Guest");
   const [currentView, setCurrentView] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
 
   // 2. Profile Sync 🔄
  useEffect(() => {
   if (!token) return;
 
-  fetch('http://localhost:5000/api/user', {
+  fetch(`${API_BASE_URL}/api/user`, {
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json'
